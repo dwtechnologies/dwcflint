@@ -1,0 +1,528 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+Description: Mall Integrations
+
+Parameters:
+  Service:
+    Type: String
+  Environment:
+    Type: String
+  App:
+    Type: String
+  Stage:
+    Type: String
+  Region:
+    Type: String
+
+Mappings:
+  dev:
+    api:
+      internal: dev-api-internal.examplecompany.com
+      someRegion: 19
+    examplemall-locationA:
+      customerid: C180000011
+      machineid: "0600586"
+      landlordid: 735fd426-215c-4f54-95dd-0e4134be74c5
+    examplemall-locationB:
+      customerid: C180000010
+      machineid: 02500381
+      landlordid: b9a9c73a-7c3d-4989-882a-de83561d758b
+    examplemall-locationC:
+      customerid: C180000016
+      machineid: "6000631"
+      landlordid: c7e36cde-6e46-4d08-95cd-d0b8fb4b007c
+  test:
+    api:
+      internal: test-api-internal.examplecompany.com
+      someRegion: 19
+    examplemall-locationA:
+      customerid: C180000006
+      machineid: "_0600586"
+      landlordid: 735fd426-215c-4f54-95dd-0e4134be74c5
+    examplemall-locationB:
+      customerid: C180000010
+      machineid: "2500381"
+      landlordid: b9a9c73a-7c3d-4989-882a-de83561d758b
+    examplemall-locationC:
+      customerid: C180000016
+      machineid: "6000631"
+      landlordid: c7e36cde-6e46-4d08-95cd-d0b8fb4b007c
+  prod:
+    api:
+      internal: api-internal.examplecompany.com
+      someRegion: 19
+    examplemall-locationA:
+      customerid: C180000011
+      machineid: "_0600586"
+      landlordid: 735fd426-215c-4f54-95dd-0e4134be74c5
+    examplemall-locationB:
+      customerid: C180000010
+      machineid: "2500381"
+      landlordid: b9a9c73a-7c3d-4989-882a-de83561d758b
+    examplemall-locationC:
+      customerid: C180000016
+      machineid: "6000631"
+      landlordid: c7e36cde-6e46-4d08-95cd-d0b8fb4b007c
+
+Globals:
+  Function:
+    Runtime: nodejs10.x
+    MemorySize: 128
+    Timeout: 300
+    Handler: index.handler
+
+Resources:
+
+# DYNAMO
+  SalesReportsDB:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub ${Service}-salesreports-${Environment}
+      AttributeDefinitions:
+        - AttributeName: landlordId
+          AttributeType: S
+        - AttributeName: reportId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: landlordId
+          KeyType: HASH
+        - AttributeName: reportId
+          KeyType: RANGE
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+      GlobalSecondaryIndexes:
+        - IndexName: taxStatus-index
+          KeySchema:
+            - AttributeName: landlordId
+              KeyType: HASH
+          ProvisionedThroughput:
+            ReadCapacityUnits: 5
+            WriteCapacityUnits: 5
+          Projection:
+            ProjectionType: ALL
+
+  LandlordInfoDB:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub ${Service}-landlordinfo-${Environment}
+      AttributeDefinitions:
+        - AttributeName: landlordId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: landlordId
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  FileSerialNumbersDB:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub ${Service}-fileserialnumbers-${Environment}
+      AttributeDefinitions:
+        - AttributeName: landlordId
+          AttributeType: S
+        - AttributeName: reportType
+          AttributeType: S
+      KeySchema:
+        - AttributeName: landlordId
+          KeyType: HASH
+        - AttributeName: reportType
+          KeyType: RANGE
+
+  ExampleTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub ${Service}-exampleTable
+      AttributeDefinitions:
+        - AttributeName: INDEX
+          AttributeType: S
+      KeySchema:
+        - AttributeName: INDEX
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+# LAMBDA
+  DailySalesPollerExampleMall01:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${Service}-MallSalesDailyReportPoller01
+      CodeUri: ../src/poller
+      Description: 'Daily sales reporter for examplemalls store in locationA'
+      Runtime: nodejs8.10
+      Policies:
+        - AmazonSQSFullAccess
+        - AmazonDynamoDBFullAccess
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/nav-client-fullaccess
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          INTERNAL_API: !FindInMap [!Ref Environment, api, internal]
+          SQS_QUEUE_URL: !Ref SalesReportsQueue
+          FILE_SERIAL_NUMBERS_TABLENAME: !Sub ${Service}-fileserialnumbers-${Environment}
+          SALES_REPORTS_TABLENAME: !Sub ${Service}-salesreports-${Environment}
+          CUSTOMER_ID: !FindInMap [!Ref Environment, examplemall-locationA, customerid]
+          MACHINE_ID: !FindInMap [!Ref Environment, examplemall-locationA, machineid]
+          NAV_REGION_ID: !FindInMap [!Ref Environment, api, someRegion]
+          LANDLORD_ID: !FindInMap [!Ref Environment, examplemall-locationA, landlordid]
+      Events:
+        Timer:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 3 * * ? *)
+
+  DailySalesPollerExampleMall02:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${Service}-MallSalesDailyReportPoller02
+      CodeUri: ../src/poller
+      Description: 'Daily sales reporter for examplemalls store in locationB'
+      Runtime: nodejs10.x
+      Policies:
+        - AmazonSQSFullAccess
+        - AmazonDynamoDBFullAccess
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/nav-client-fullaccess
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          INTERNAL_API: !FindInMap [!Ref Environment, api, internal]
+          SQS_QUEUE_URL: !Ref SalesReportsQueue
+          FILE_SERIAL_NUMBERS_TABLENAME: !Sub ${Service}-fileserialnumbers-${Environment}
+          SALES_REPORTS_TABLENAME: !Sub ${Service}-salesreports-${Environment}
+          CUSTOMER_ID: !FindInMap [!Ref Environment, examplemall-locationB, customerid]
+          MACHINE_ID: !FindInMap [!Ref Environment, examplemall-locationB, machineid]
+          NAV_REGION_ID: !FindInMap [!Ref Environment, api, someRegion]
+          LANDLORD_ID: !FindInMap [!Ref Environment, examplemall-locationB, landlordid]
+      Events:
+        Timer:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 3 * * ? *)
+
+  DailySalesPollerExampleMall03:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${Service}-MallSalesDailyReportPoller03
+      CodeUri: ../src/poller
+      Description: 'Daily sales reporter for examplemalls store in locationC'
+      Runtime: nodejs12.x
+      Policies:
+        - AmazonSQSFullAccess
+        - AmazonDynamoDBFullAccess
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/nav-client-fullaccess
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          INTERNAL_API: !FindInMap [!Ref Environment, api, internal]
+          SQS_QUEUE_URL: !Ref SalesReportsQueue
+          FILE_SERIAL_NUMBERS_TABLENAME: !Sub ${Service}-fileserialnumbers-${Environment}
+          SALES_REPORTS_TABLENAME: !Sub ${Service}-salesreports-${Environment}
+          CUSTOMER_ID: !FindInMap [!Ref Environment, examplemall-locationC, customerid]
+          MACHINE_ID: !FindInMap [!Ref Environment, examplemall-locationC, machineid]
+          NAV_REGION_ID: !FindInMap [!Ref Environment, api, someRegion]
+          LANDLORD_ID: !FindInMap [!Ref Environment, examplemall-locationC, landlordid]
+      Events:
+        Timer:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 3 * * ? *)
+
+  MonthlySalesPollerExampleMall01:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${Service}-MallSalesMonthlyReportPoller01
+      CodeUri: ../src/monthly-poller
+      Description: 'Monthly sales reporter for examplemalls store in locationA'
+      Policies:
+        - AmazonSQSFullAccess
+        - AmazonDynamoDBFullAccess
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/nav-client-fullaccess
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          INTERNAL_API: !FindInMap [!Ref Environment, api, internal]
+          SQS_QUEUE_URL: !Ref SalesReportsQueue
+          FILE_SERIAL_NUMBERS_TABLENAME: !Sub ${Service}-fileserialnumbers-${Environment}
+          SALES_REPORTS_TABLENAME: !Sub ${Service}-salesreports-${Environment}
+          CUSTOMER_ID: !FindInMap [!Ref Environment, examplemall-locationA, customerid]
+          MACHINE_ID: !FindInMap [!Ref Environment, examplemall-locationA, machineid]
+          NAV_REGION_ID: !FindInMap [!Ref Environment, api, someRegion]
+          LANDLORD_ID: !FindInMap [!Ref Environment, examplemall-locationA, landlordid]
+      Events:
+        Timer:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 16 1 * ? *)
+
+  MonthlySalesPollerExampleMall02:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${Service}-MallSalesMonthlyReportPoller02
+      CodeUri: ../src/monthly-poller
+      Description: 'Monthly sales reporter for examplemalls store in locationB'
+      Policies:
+        - AmazonSQSFullAccess
+        - AmazonDynamoDBFullAccess
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/nav-client-fullaccess
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          INTERNAL_API: !FindInMap [!Ref Environment, api, internal]
+          SQS_QUEUE_URL: !Ref SalesReportsQueue
+          FILE_SERIAL_NUMBERS_TABLENAME: !Sub ${Service}-fileserialnumbers-${Environment}
+          SALES_REPORTS_TABLENAME: !Sub ${Service}-salesreports-${Environment}
+          CUSTOMER_ID: !FindInMap [!Ref Environment, examplemall-locationB, customerid]
+          MACHINE_ID: !FindInMap [!Ref Environment, examplemall-locationB, machineid]
+          NAV_REGION_ID: !FindInMap [!Ref Environment, api, someRegion]
+          LANDLORD_ID: !FindInMap [!Ref Environment, examplemall-locationB, landlordid]
+      Events:
+        Timer:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 16 1 * ? *)
+
+  MonthlySalesPollerExampleMall03:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${Service}-MallSalesMonthlyReportPoller03
+      CodeUri: ../src/monthly-poller
+      Description: 'Monthly sales reporter for examplemalls store in locationC'
+      Policies:
+        - AmazonSQSFullAccess
+        - AmazonDynamoDBFullAccess
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/nav-client-fullaccess
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          INTERNAL_API: !FindInMap [!Ref Environment, api, internal]
+          SQS_QUEUE_URL: !Ref SalesReportsQueue
+          FILE_SERIAL_NUMBERS_TABLENAME: !Sub ${Service}-fileserialnumbers-${Environment}
+          SALES_REPORTS_TABLENAME: !Sub ${Service}-salesreports-${Environment}
+          CUSTOMER_ID: !FindInMap [!Ref Environment, examplemall-locationC, customerid]
+          MACHINE_ID: !FindInMap [!Ref Environment, examplemall-locationC, machineid]
+          NAV_REGION_ID: !FindInMap [!Ref Environment, api, someRegion]
+          LANDLORD_ID: !FindInMap [!Ref Environment, examplemall-locationC, landlordid]
+      Events:
+        Timer:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 16 1 * ? *)
+
+  SftpUploader:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${Service}-MallSalesReportSftpUploader
+      CodeUri: ../src/uploader
+      Description: 'Listen to SQS, retrieve ledger data and upload to external SFTP'
+      Policies:
+        - AmazonDynamoDBFullAccess
+        - AmazonSSMFullAccess
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          FILE_SERIAL_NUMBERS_TABLENAME: !Sub ${Service}-fileserialnumbers-${Environment}
+          LANDLORD_INFO_TABLENAME: !Sub ${Service}-landlordinfo-${Environment}
+          SALES_REPORTS_TABLENAME: !Sub ${Service}-salesreports-${Environment}
+      Events:
+        SQSTrigger:
+          Properties:
+            BatchSize: 1
+            Queue:
+              Fn::GetAtt:
+                - "SalesReportsQueue"
+                - "Arn"
+          Type: SQS
+
+  ExampleLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${Service}-ExampleLambda
+      CodeUri: ../src/missing
+      Description: 'Example lambda missing a log group'
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          PATH: 'test'
+
+  AnotherExampleLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: nodejs8.10
+      MemorySize: 128
+      Timeout: 300
+      Handler: index.handler
+      FunctionName: !Sub ${Service}-AnotherExampleLambda
+      Code: {}
+      Role: 'none'
+      Description: 'Another example lambda missing a log group'
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          LANG: test
+
+# SQS
+  SalesReportsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub ${Service}-salesreports-${Environment}
+      RedrivePolicy:
+        deadLetterTargetArn:
+          Fn::GetAtt:
+            - DeadLetterQueue
+            - Arn
+        maxReceiveCount: 10
+      VisibilityTimeout: 301
+  DeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub ${Service}-salesreports-deadletter-${Environment}
+      MessageRetentionPeriod: 604800 #7 days
+
+  PutItemShipmentsLambdaRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - lambda.amazonaws.com
+              Action:
+                - sts:AssumeRole
+        ManagedPolicyArns:
+          - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        Path: /
+        Policies:
+          - PolicyName: Lambda
+            PolicyDocument:
+              Version: 2012-10-17
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - dynamodb:*
+                  Resource:
+                    - !Sub arn:aws:dynamodb:${AWS::Region}:*:table/${Service}-${Environment}*
+                - Effect: Allow
+                  Action:
+                    - s3:*
+                  Resource:
+                    - !Sub arn:aws:s3:::${Service}-${Environment}/*
+                - Effect: Allow
+                  Action:
+                    - s3:GetObject
+                  Resource:
+                    - !Sub arn:aws:s3:::config-nav-regions-dwtech-${Environment}/*
+                - Effect: Allow
+                  Action:
+                    - sns:*
+                  Resource:
+                    - !Sub arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${Service}-sns-${Environment}
+        RoleName: !Sub PutItemShipmentsLambdaRole-${Environment}
+
+  ScheduledSalesPollerRole01:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: ScheduledSalesPollerRole01
+      ScheduleExpression: !FindInMap [ !Ref Environment, nav, interval ]
+      State: ENABLED
+      Name: salesOrderPoller-01
+      Targets:
+        - Arn: !GetAtt SftpUploader.Arn
+          Id: "01"
+
+# LOGS
+  MallSalesDailyReportPoller01LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${Service}-MallSalesDailyReportPoller01-${Environment}'
+
+  MallSalesDailyReportPoller01LogForwardSubscription:
+    Type: AWS::Logs::SubscriptionFilter
+    Properties:
+      DestinationArn: arn:aws:logs:eu-west-1:494090316628:destination:overwatch-v1
+      FilterPattern: "[time, uuid, app=overwatch*, metric]"
+      LogGroupName: !Sub '/aws/lambda/${Service}-MallSalesDailyReportPoller01-${Environment}'
+
+  MallSalesDailyReportPoller02LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${Service}-MallSalesDailyReportPoller02-${Environment}'
+
+  MallSalesDailyReportPoller02LogForwardSubscription:
+    Type: AWS::Logs::SubscriptionFilter
+    Properties:
+      DestinationArn: arn:aws:logs:eu-west-1:494090316628:destination:overwatch-v1
+      FilterPattern: "[time, uuid, app=overwatch*, metric]"
+      LogGroupName: !Sub '/aws/lambda/${Service}-MallSalesDailyReportPoller02-${Environment}'
+
+  MallSalesDailyReportPoller03LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${Service}-MallSalesDailyReportPoller03-${Environment}'
+
+  MallSalesDailyReportPoller03LogForwardSubscription:
+    Type: AWS::Logs::SubscriptionFilter
+    Properties:
+      DestinationArn: arn:aws:logs:eu-west-1:494090316628:destination:overwatch-v1
+      FilterPattern: "[time, uuid, app=overwatch*, data]"
+      LogGroupName: !Sub '/aws/lambda/${Service}-MallSalesDailyReportPoller03-${Environment}'
+
+  MallSalesMonthlyReportPoller01LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${Service}-MallSalesMonthlyReportPoller01-${Environment}'
+
+  MallSalesMonthlyReportPoller01LogForwardSubscription:
+    Type: AWS::Logs::SubscriptionFilter
+    Properties:
+      DestinationArn: arn:aws:logs:eu-west-1:494090316628:destination:overwatch-v1
+      FilterPattern: "[time, uuid, level, app=overwatch*, data]"
+      LogGroupName: !Sub '/aws/lambda/${Service}-MallSalesMonthlyReportPoller01-${Environment}'
+
+  MallSalesMonthlyReportPoller02LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${Service}-MallSalesMonthlyReportPoller02-${Environment}'
+
+  MallSalesMonthlyReportPoller02LogForwardSubscription:
+    Type: AWS::Logs::SubscriptionFilter
+    Properties:
+      DestinationArn: arn:aws:logs:eu-west-1:494090316628:destination:overwatch-v1
+      FilterPattern: "[time, uuid, app=overwatch*, metric]"
+      LogGroupName: !Sub '/aws/lambda/${Service}-MallSalesMonthlyReportPoller02-${Environment}'
+
+  MallSalesMonthlyReportPoller03LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${Service}-MallSalesMonthlyReportPoller03-${Environment}'
+
+  MallSalesMonthlyReportPoller03LogForwardSubscription:
+    Type: AWS::Logs::SubscriptionFilter
+    Properties:
+      DestinationArn: arn:aws:logs:eu-west-1:494090316628:destination:overwatch-v1
+      FilterPattern: "[time, uuid, app=overwatch*, metric]"
+      LogGroupName: !Sub '/aws/lambda/${Service}-MallSalesMonthlyReportPoller03-${Environment}'
+
+  MallSalesReportSftpUploaderLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${SftpUploader}'
+
+  MallSalesReportSftpUploaderLogForwardSubscription:
+    Type: AWS::Logs::SubscriptionFilter
+    Properties:
+      DestinationArn: arn:aws:logs:eu-west-1:494090316628:destination:overwatch-v1
+      FilterPattern: "[time, uuid, app=overwatch, metric]"
+      LogGroupName: !Sub '/aws/lambda/${SftpUploader}'
+
+  ExampleSubscriptionFilterWithoutMatchingLogGroup:
+    Type: AWS::Logs::SubscriptionFilter
+    Properties:
+      DestinationArn: arn:aws:logs:eu-west-1:494090316628:destination:overwatch-v1
+      FilterPattern: "[time, uuid, app=overwatch*, metric]"
+      LogGroupName: !Sub '/aws/lambda/${Service}-LambdaThatDoesNotExist-${Environment}'
+
+  ExampledLogGroupWithoutMatchingSubscriptionFilter:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${Service}-AnotherLambdaThatDoesNotExist-${Environment}'

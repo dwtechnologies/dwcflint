@@ -1,0 +1,248 @@
+swagger: '2.0'
+info:
+  description: The API of the Prices service
+  version: "0.1"
+  title: Common Interface Prices
+  contact:
+    email: support@example.com
+
+paths:
+
+  /{regionId}/pricesLists/{priceListId}:
+    get:
+      produces:
+        - application/json
+      parameters:
+        - in: path
+          name: regionId
+          required: true
+          type: string
+          minimum: 1
+          description: ERP Region Id
+        - in: path
+          name: priceListId
+          required: true
+          type: integer
+          minimum: 1
+          description: The id of the price list
+        - in: query
+          name: skus
+          description: One or more sku/s
+          type: string
+          required: false
+        - in: query
+          name: currencyCode
+          description: Currency code
+          type: string
+          required: false
+      responses:
+        200:
+          description: Price List response
+          schema:
+            type: array
+            items:
+              $ref: "#/definitions/PriceList"
+        400:
+          description: Bad Request
+          schema:
+            $ref: "#/definitions/ErrorMessage"
+        500:
+          description: Internal Server Error
+          schema:
+            $ref: "#/definitions/ErrorMessage"
+      security:
+        - sigv4: []
+      x-amazon-apigateway-integration:
+       type: aws_proxy
+       uri:
+         Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${Service}-getPrices/invocations
+       credentials:
+         Fn::Sub: ${GetPricesApiRole.Arn}
+       httpMethod: POST
+       responses:
+         4\d{2}:
+           statusCode: 400
+           responseTemplates:
+             application/json: "{ \"message\": $input.json(\"$.message\") }"
+         default:
+           statusCode: 200
+           responseTemplates:
+             application/json: "{ \"message\": \"Success\" }"
+
+  /{regionId}/pricesLists/{priceListId}/discountLists/{discountListId}:
+    get:
+      produces:
+        - application/json
+      parameters:
+        - in: path
+          name: regionId
+          required: true
+          type: string
+          minimum: 1
+          description: ERP Region Id
+        - in: path
+          name: priceListId
+          required: true
+          type: integer
+          minimum: 1
+          description: The id of the price list
+        - in: path
+          name: discountListId
+          required: true
+          type: integer
+          minimum: 1
+          description: The id of the discount list
+        - in: query
+          name: skus
+          description: One or more sku/s
+          type: string
+          required: false
+        - in: query
+          name: currencyCode
+          description: Currency code
+          type: string
+          required: false
+      responses:
+        200:
+          description: Definition generated from Swagger Inspector
+          schema:
+            type: array
+            items:
+              $ref: "#/definitions/PriceListResponse"
+        400:
+          description: Bad Request
+          schema:
+            $ref: "#/definitions/ErrorMessage"
+        500:
+          description: Internal Server Error
+          schema:
+            $ref: "#/definitions/ErrorMessage"
+      security:
+        - sigv4: []
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${Service}-getPrices/invocations
+        credentials:
+          Fn::Sub: ${GetPricesApiRole.Arn}
+        httpMethod: POST
+        responses:
+          4\d{2}:
+            statusCode: 400
+            responseTemplates:
+              application/json: "{ \"message\": $input.json(\"$.message\") }"
+          default:
+            statusCode: 200
+            responseTemplates:
+              application/json: "{ \"message\": \"Success\" }"
+
+
+securityDefinitions:
+
+  sigv4:
+    type: "apiKey"
+    name: "Authorization"
+    in: "header"
+    x-amazon-apigateway-authtype: "awsSigv4"
+
+definitions:
+
+  PriceListResponse:
+    type: object
+    required:
+      - prices
+      - discountPrice
+      - discountPercentage
+    properties:
+      prices:
+        type: array
+        description: Array of price objects
+        items:
+          $ref: '#/definitions/Price'
+      discountPrice:
+        type: number
+        description: Price of a unit after discount
+      discountPercentage:
+        type: number
+        description: Discount percentage applied for the item
+
+  Price:
+    type: object
+    description: Price object
+    required:
+      - productId
+      - currencyCode
+      - unitOfMeasureCode
+      - unitPrice
+      - price
+      - startingDate
+      - endingDate
+    properties:
+      productId:
+        type: string
+        description: Stock Keeping Unit (Item number)
+      currencyCode:
+        type: string
+        description: Currency Code
+      unitOfMeasureCode:
+        type: string
+        description: Unit of Measure
+      unitPrice:
+        type: number
+        description: Price of a unit
+      price:
+        type: number
+        description: Total price
+      startingDate:
+        type: string
+        description: Start date of the priece to be active
+      endingDate:
+        type: string
+        description: End date upto which the price should be active
+
+  PriceList:
+    type: object
+    description: Price object
+    required:
+      - productId
+      - currencyCode
+      - unitOfMeasureCode
+      - unitPrice
+      - price
+      - startingDate
+      - endingDate
+    properties:
+      productId:
+        type: string
+        description: Stock Keeping Unit (Item number)
+      currencyCode:
+        type: string
+        description: Currency Code
+      unitOfMeasureCode:
+        type: string
+        description: Unit of Measure
+      unitPrice:
+        type: number
+        description: Original price per unit
+      price:
+        type: number
+        description: Total price
+      startingDate:
+        type: string
+        description: Start date of the priece to be active
+      endingDate:
+        type: string
+        description: End date upto which the price should be active
+
+  ErrorMessage:
+    type: object
+    properties:
+      statusCode:
+        type: number
+        description: Error Code
+      message:
+        type: string
+        description: Reason for Error
+
+schemes:
+  - https

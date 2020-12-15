@@ -1,0 +1,120 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+Description: example persistent stack
+
+Parameters:
+  Environment:
+    Type: String
+  Service:
+    Type: String
+  FilterPattern:
+    Type: String
+    Default: "[time, uuid, level, app=overwatch*, metric]"
+
+Resources:
+  ExampleLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: nodejs10.x
+      FunctionName: !Sub ${Service}-ExampleLambda
+      Handler: index.handler
+      CodeUri: ../src/missing
+      Description: 'Example lambda'
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+
+  AnotherExampleLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: nodejs8.10
+      MemorySize: 128
+      Timeout: 300
+      Handler: index.handler
+      FunctionName: !Sub ${Service}-AnotherExampleLambda
+      Code: {}
+      Role: 'none'
+      Description: 'Another example lambda'
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+
+  YetAnotherExampleLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: nodejs10.x
+      MemorySize: 128
+      Timeout: 300
+      Handler: index.handler
+      FunctionName: !Sub ${Service}-YetAnotherExampleLambda
+      Code: {}
+      Role: 'none'
+      Description: 'Yet another example lambda'
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+
+  YetAnotherAdditionalExampleLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: nodejs12.x
+      MemorySize: 128
+      Timeout: 300
+      Handler: index.handler
+      FunctionName: !Sub ${Service}-YetAnotherAdditionalExampleLambda
+      Code: {}
+      Role: 'none'
+      Description: 'Yet another additional example lambda'
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+
+  ExampleLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ExampleLambda}'
+
+  ExampleSubscriptionFilter:
+    Type: AWS::Logs::SubscriptionFilter
+    Properties:
+      DestinationArn: arn:aws:logs:eu-west-1:494090316628:destination:overwatch-v1
+      FilterPattern: "[time, uuid, level, app=overwatch*, metric]"
+      LogGroupName: !Sub '/aws/lambda/${ExampleLambda}'
+
+  AnotherExampleLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AnotherExampleLambda}'
+
+  AnotherExampleSubscriptionFilter:
+    Type: AWS::Logs::SubscriptionFilter
+    Properties:
+      DestinationArn: arn:aws:logs:eu-west-1:494090316628:destination:overwatch-v1
+      FilterPattern: "[time, uuid, app=overwatch*, metric]"
+      LogGroupName: !Sub '/aws/lambda/${AnotherExampleLambda}'
+
+  YetAnotherExampleLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${YetAnotherExampleLambda}'
+      RetentionInDays: 30
+
+  YetAnotherExampleSubscriptionFilter:
+    Type: AWS::Logs::SubscriptionFilter
+    Properties:
+      DestinationArn: arn:aws:logs:eu-west-1:494090316628:destination:overwatch-v1
+      FilterPattern: "[time, uuid, app=overwatch*, metric]"
+      LogGroupName: !Sub '/aws/lambda/${YetAnotherExampleLambda}'
+
+  YetAnotherAdditionalExampleLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${YetAnotherAdditionalExampleLambda}'
+      RetentionInDays: 30
+
+  YetAnotherAdditionalExampleSubscriptionFilter:
+    Type: AWS::Logs::SubscriptionFilter
+    Properties:
+      DestinationArn: arn:aws:logs:eu-west-1:494090316628:destination:overwatch-v1
+      FilterPattern: !Ref FilterPattern
+      LogGroupName: !Sub '/aws/lambda/${YetAnotherAdditionalExampleLambda}'

@@ -1,0 +1,80 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+Description: Test stack for networking resources
+
+Parameters:
+  Environment:
+    Type: String
+  Swagger:
+    Type: String
+
+Resources:
+  RestApi0:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Environment
+      DefinitionBody:
+        Fn::Transform:
+          Name: AWS::Include
+          Parameters:
+            Location: !Ref Swagger
+      EndpointConfiguration: EDGE
+
+  RestApi1:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Body:
+        swagger: '2.0'
+        info:
+          version: '0.0.1'
+          title: test
+        basePath: /pete
+        schemes:
+          - https
+        definitions:
+          Empty:
+            type: object
+      Name: myApi
+      Parameters:
+        endpointConfigurationTypes: REGIONAL
+
+  RestApi2:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      Name: 'RestApi2'
+
+  RestApi3:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Environment
+      DefinitionBody:
+        Fn::Transform:
+          Name: AWS::Include
+          Parameters:
+            Location: !Ref Swagger
+
+  RestApi4:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Body:
+        swagger: '2.0'
+        info:
+          version: '0.0.1'
+          title: test
+        basePath: /pete
+        schemes:
+          - https
+        definitions:
+          Empty:
+            type: object
+      Name: myApi
+      Parameters:
+        test: HEJSAN
+
+  RestApi5:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: 'RestApi2'

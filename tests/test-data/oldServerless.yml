@@ -1,0 +1,81 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Serverless stack to consume ERP events
+
+Parameters:
+  Service:
+    Type: String
+  Environment:
+    Type: String
+
+Mappings:
+  dev:
+    api:
+      domain: dev-api-internal.examplecompany.com
+  test:
+    api:
+      domain: test-api-internal.examplecompany.com
+  stage:
+    api:
+      domain: api-stage-internal.examplecompany.com
+  prod:
+    api:
+      domain: api-internal.examplecompany.com
+
+Globals:
+  Function:
+    Runtime: nodejs12.x
+    Timeout: 300
+    Handler: index.handler
+    MemorySize: 128
+
+Resources:
+
+  ItemConsumer:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${Service}-consumer
+      CodeUri: ../src/consumer
+      Description: Consumes Item objects from SQS and put into stock-items
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - sqs:ChangeMessageVisibility
+              Resource:
+                - Fn::ImportValue: ItemQueueArn
+        - AWSLambdaSQSQueueExecutionRole
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/stock-items-fullaccess-${Environment}
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/erp-client-fullaccess
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          STOCK_ITEMS_BASEPATH: items
+          API_HOST:
+            Fn::FindInMap: [ !Ref Environment, api, domain ]
+          SQS_URL:
+            Fn::ImportValue: ItemQueueUrl
+      Events:
+        SQSTrigger:
+          Type: SQS
+          Enabled: true
+          Properties:
+            Queue:
+              Fn::ImportValue: ItemQueueArn
+            BatchSize: 1
+
+  ItemConsumerLog:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${Service}-consumer
+      RetentionInDays: 60
+
+  ItemConsumerLogSubscription:
+    Type: AWS::Logs::SubscriptionFilter
+    DependsOn:
+      - ItemConsumerLog
+    Properties:
+      DestinationArn: !Sub arn:aws:logs:${AWS::Region}:494090316628:destination:overwatch-v1
+      FilterPattern: "[time, uuid, level, app=overwatch*, data]"
+      LogGroupName: !Sub /aws/lambda/${Service}-consumer

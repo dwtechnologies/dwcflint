@@ -1,0 +1,84 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+Description: example persistent stack
+
+Parameters:
+  Environment:
+    Type: String
+  Service:
+    Type: String
+
+Resources:
+# SQS
+  ExampleSQS12:
+    Type: AWS::SQS::Queue
+    Properties:
+     QueueName: !Sub ${Service}-Queue
+     VisibilityTimeout: 60
+     RedrivePolicy:
+       deadLetterTargetArn: !Sub ${DeadLetterQueue.Arn}
+       maxReceiveCount: 5
+  DeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub ${Service}-DLQ
+
+  ShipmentHandlerQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub ${Service}-ShipmentHandler-Queue
+      VisibilityTimeout: 60
+      RedrivePolicy:
+        deadLetterTargetArn: !Sub ${ShipmentHandlerQueueDLQ.Arn}
+        maxReceiveCount: 5
+  ShipmentHandlerQueueDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub ${Service}-ShipmentHandler-DLQ
+
+# DynamoDB
+  ShipmentTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub ${Service}-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+      - AttributeName: orderNo
+        AttributeType: "S"
+      - AttributeName: shipmentNo
+        AttributeType: "S"
+      - AttributeName: shipmentStatus
+        AttributeType: "S"
+      KeySchema:
+      - AttributeName: orderNo
+        KeyType: HASH
+      GlobalSecondaryIndexes:
+      - IndexName: shipmentNo-index
+        KeySchema:
+        - AttributeName: shipmentNo
+          KeyType: HASH
+        Projection:
+          ProjectionType: ALL
+      - IndexName: shipmentStatus-index
+        KeySchema:
+        - AttributeName: shipmentStatus
+          KeyType: HASH
+        Projection:
+          ProjectionType: ALL
+
+Outputs:
+  ShipmentTableTableName:
+    Description: Dynamo DB ShipmentTable table name
+    Value: ShipmentTable
+    Export:
+      Name: !Sub ShipmentTableTableName-${Environment}
+  ShipmentTableTableArn:
+    Description: Dynamo DB ShipmentTable table ARN
+    Value: ShipmentTable.Arn
+    Export:
+      Name: !Sub ShipmentTableTableArn-${Environment}
+  ShipmentHandlerQueueArn:
+    Description: ShipmentHandler SQS ARN
+    Value: ShipmentHandlerQueue.Arn
+    Export:
+      Name: !Sub ShipmentHandlerQueueArn
