@@ -7,7 +7,7 @@ setuptools.setup(
     name="dwcflint",
     version="1.2.14",
     author="Daniel Wellington",
-    author_email="dwcflint@example.com",
+    author_email="servicedesk@danielwellington.com",
     description="A collection of extra rules for linting cloudformation files",
     long_description=long_description,
     long_description_content_type="text/markdown",
