@@ -1,4 +1,5 @@
 # dwcflint - Custom rules and wrapper for Amazon's cfnlint
+[![PyPI version](https://badge.fury.io/py/dwcflint.svg)](https://badge.fury.io/py/dwcflint)
 
 This Python module is a runnable module and wrapper around Amazons cfn-lint tool for Cloudformation file linting that
 adds a few extra rules. It is written in Python 3, lightweight (only a single dependency) and fast.
