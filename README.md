@@ -88,7 +88,7 @@ positive integer representing it's id.
 
 ## Commandline usage
 
-    usage: beamcflint [-h] [--regions REGIONS]
+    usage: dwcflint [-h] [--regions REGIONS]
                       [--include-experimental INCLUDEEXPERIMENTAL]
                       [--included-rules INCLUDEDRULES]
                       [--ignored-rules IGNOREDRULES]
