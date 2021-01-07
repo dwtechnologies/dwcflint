@@ -26,7 +26,7 @@ module as it can be useful to other developers and organizations as well.
     # or for multiple files
     dwcflint 'cloudformation/*.yaml'
 
-For an even simpler setup, you can add the installation line to your custom pipeline images and then just call `beamcflint` in your project-specific pipeline step(s).
+For an even simpler setup, you can add the installation line to your custom pipeline images and then just call `dwcflint` in your project-specific pipeline step(s).
 
 ## How to add new rules
 
