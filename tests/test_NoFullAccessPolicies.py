@@ -30,7 +30,6 @@ class NoFullAccessPoliciesTest(unittest.TestCase):
 
         matches = cfnlint.core.run_checks(filename, template, rules, regions)
 
-        self.assertGreater(len(matches), 0)
         filteredMatches = [match for match in matches if match.rule.id == 'W1337']
         self.assertEqual(len(filteredMatches), 0)
 
