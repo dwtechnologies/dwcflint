@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="dwcflint",
-    version="1.2.15",
+    version="1.2.16",
     author="Daniel Wellington",
     author_email="servicedesk@danielwellington.com",
     description="A collection of extra rules for linting cloudformation files",
@@ -14,7 +14,7 @@ setuptools.setup(
     url="https://github.com/dwtechnologies/dwcflint",
     packages=setuptools.find_packages(),
     install_requires=[
-        'cfn-lint'
+        'cfn-lint>=0.54.4'
     ],
     python_requires='>=3.6',
     scripts=[
